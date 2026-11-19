@@ -147,6 +147,8 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 - (void)appDidBecomeActive:(NSNotification *)note;
 - (BOOL)viewLooksLikeTabItem:(UIView *)v;
 - (void)dumpBottomHierarchy:(UIWindow *)win;
+- (void)dumpView:(UIView *)v window:(UIWindow *)win depth:(NSInteger)depth into:(NSMutableString *)out lines:(NSInteger *)lines;
+- (BOOL)subtree:(UIView *)v hasIconOrLabelAtDepth:(NSInteger)depth;
 - (void)collectCandidatesInView:(UIView *)v window:(UIWindow *)win depth:(NSInteger)depth best:(UIView **)best bestScore:(NSInteger *)bestScore bestItems:(NSArray<UIView *> **)bestItems;
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gr shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other;
 @end
@@ -614,23 +616,37 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (self.dumpedBottomHierarchy || !win) return;
     self.dumpedBottomHierarchy = YES;
     NSMutableString *out = [NSMutableString stringWithString:@"--- Cay view vung day (chan doan bar tu che) ---\n"];
-    __block NSInteger lines = 0;
-    void (^__block walk)(UIView *, NSInteger);
-    walk = ^(UIView *v, NSInteger depth) {
-        if (lines > 220) return;
-        CGRect inWin = [v convertRect:v.bounds toView:win];
-        if (CGRectGetMaxY(inWin) > win.bounds.size.height * 0.62 && v.bounds.size.width > 24) {
-            lines++;
-            NSMutableString *pad = [NSMutableString string];
-            for (NSInteger i = 0; i < depth; i++) [pad appendString:@"  "];
-            [out appendFormat:@"%@%@ %@\n", pad, NSStringFromClass([v class]), NSStringFromCGRect(v.frame)];
-        }
-        if (depth < 14) {
-            for (UIView *sub in v.subviews) walk(sub, depth + 1);
-        }
-    };
-    walk(win, 0);
+    NSInteger lines = 0;
+    [self dumpView:win window:win depth:0 into:out lines:&lines];
     LGBLog(@"%@", out);
+}
+
+// Đệ quy bằng method thường — KHÔNG dùng block tự gọi chính nó: dưới ARC
+// + -Werror, block bắt chính nó bị lỗi -Warc-retain-cycles lúc biên dịch
+// (đã dính thật ở bản build đầu của LiquidGlassBar, dòng 629/646).
+- (void)dumpView:(UIView *)v window:(UIWindow *)win depth:(NSInteger)depth into:(NSMutableString *)out lines:(NSInteger *)lines {
+    if (*lines > 220) return;
+    CGRect inWin = [v convertRect:v.bounds toView:win];
+    if (CGRectGetMaxY(inWin) > win.bounds.size.height * 0.62 && v.bounds.size.width > 24) {
+        (*lines)++;
+        NSMutableString *pad = [NSMutableString string];
+        for (NSInteger i = 0; i < depth; i++) [pad appendString:@"  "];
+        [out appendFormat:@"%@%@ %@\n", pad, NSStringFromClass([v class]), NSStringFromCGRect(v.frame)];
+    }
+    if (depth < 14) {
+        for (UIView *sub in v.subviews) {
+            [self dumpView:sub window:win depth:depth + 1 into:out lines:lines];
+        }
+    }
+}
+
+- (BOOL)subtree:(UIView *)v hasIconOrLabelAtDepth:(NSInteger)depth {
+    if ([v isKindOfClass:[UIImageView class]] || [v isKindOfClass:[UILabel class]]) return YES;
+    if (depth >= 4) return NO;
+    for (UIView *sub in v.subviews) {
+        if ([self subtree:sub hasIconOrLabelAtDepth:depth + 1]) return YES;
+    }
+    return NO;
 }
 
 // Một view con có "trông giống mục của tab bar" không: có icon hoặc chữ,
@@ -638,15 +654,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 - (BOOL)viewLooksLikeTabItem:(UIView *)v {
     if ([v isKindOfClass:[UIControl class]]) return YES;
     if (v.gestureRecognizers.count > 0) return YES;
-    __block BOOL found = NO;
-    void (^__block walk)(UIView *, NSInteger);
-    walk = ^(UIView *cur, NSInteger depth) {
-        if (found || depth > 4) return;
-        if ([cur isKindOfClass:[UIImageView class]] || [cur isKindOfClass:[UILabel class]]) { found = YES; return; }
-        for (UIView *sub in cur.subviews) walk(sub, depth + 1);
-    };
-    walk(v, 0);
-    return found;
+    return [self subtree:v hasIconOrLabelAtDepth:0];
 }
 
 - (void)collectCandidatesInView:(UIView *)v window:(UIWindow *)win depth:(NSInteger)depth
