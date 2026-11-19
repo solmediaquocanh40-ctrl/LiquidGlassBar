@@ -1,4 +1,4 @@
-// LiquidGlassBar 1.0.0 — thanh tab bar kiểu Liquid Glass cho Messenger:
+// LiquidGlassBar 1.1.0 — thanh tab bar kiểu Liquid Glass cho Messenger:
 // nền kính mờ dạng viên thuốc nổi, cục glass chọn kéo trượt ngang qua lại
 // để chọn mục, icon của mục được chọn đổi sang màu tuỳ chọn trong Cài đặt.
 //
@@ -19,10 +19,27 @@
 
 static NSString *const LGB_DOMAIN = @"com.vn.liquidglassbar";
 static NSString *const LGB_PREFS_NOTIFICATION = @"com.vn.liquidglassbar/prefsChanged";
-static NSString *const LGB_LOG_PATH = @"/var/mobile/Documents/LiquidGlassBar.log";
+
+// Log ghi vào thư mục Documents của CHÍNH Messenger (bản 1.0.0 ghi ra
+// /var/mobile/Documents bị sandbox của app chặn nên không tạo được file).
+// Trong Filza: tìm kiếm toàn máy "LiquidGlassBar.log" là thấy, hoặc vào
+// /var/mobile/Containers/Data/Application/<thư mục Messenger>/Documents/.
+static NSString *LGBLogFilePath(void) {
+    static NSString *path = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSArray *dirs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *base = dirs.firstObject;
+        path = base ? [base stringByAppendingPathComponent:@"LiquidGlassBar.log"]
+                    : @"/var/mobile/Documents/LiquidGlassBar.log";
+    });
+    return path;
+}
 
 static const NSInteger LGB_BG_TAG = 712001;
 static const NSInteger LGB_INDICATOR_TAG = 712002;
+static const NSInteger LGB_TINT_WHITE_TAG = 712011;
+static const NSInteger LGB_TINT_COLOR_TAG = 712012;
 
 static BOOL pEnabled = YES;
 static BOOL pDragEnabled = YES;
@@ -46,9 +63,9 @@ static void LGBLog(NSString *fmt, ...) {
                                                          dateStyle:NSDateFormatterNoStyle
                                                          timeStyle:NSDateFormatterMediumStyle],
                           msg];
-        NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:LGB_LOG_PATH];
+        NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:LGBLogFilePath()];
         if (!fh) {
-            [line writeToFile:LGB_LOG_PATH atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            [line writeToFile:LGBLogFilePath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
         } else {
             [fh seekToEndOfFile];
             [fh writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
@@ -63,6 +80,28 @@ static id LGBGetPref(NSString *key, id def) {
                                                     (__bridge CFStringRef)LGB_DOMAIN);
     id obj = (__bridge_transfer id)v;
     return obj ?: def;
+}
+
+// Ghi "dấu vết chẩn đoán" vào miền prefs của tweak qua CFPreferences —
+// đường này đi qua tiến trình hệ thống cfprefsd nên KHÔNG bị sandbox của
+// Messenger chặn (khác với ghi file trực tiếp ở bản 1.0.0). Trang Cài đặt
+// đọc lại các khoá diag_* này ở nút "Xem trạng thái nạp tweak".
+static void LGBDiagWrite(NSString *key, id value) {
+    if (value) {
+        CFPreferencesSetAppValue((__bridge CFStringRef)key,
+                                 (__bridge CFPropertyListRef)value,
+                                 (__bridge CFStringRef)LGB_DOMAIN);
+    } else {
+        CFPreferencesSetAppValue((__bridge CFStringRef)key, NULL,
+                                 (__bridge CFStringRef)LGB_DOMAIN);
+    }
+    CFPreferencesAppSynchronize((__bridge CFStringRef)LGB_DOMAIN);
+}
+
+static NSString *LGBNowString(void) {
+    return [NSDateFormatter localizedStringFromDate:[NSDate date]
+                                          dateStyle:NSDateFormatterShortStyle
+                                          timeStyle:NSDateFormatterMediumStyle];
 }
 
 static void LGBLoadPrefs(void) {
@@ -119,10 +158,13 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 @property (nonatomic, assign) NSInteger customSelectedIndex;
 @property (nonatomic, assign) NSInteger previewIndex;
 @property (nonatomic, strong) NSTimer *scanTimer;
+@property (nonatomic, assign) NSInteger scanCount;
+@property (nonatomic, copy) NSString *diagState;
 @property (nonatomic, assign) BOOL dumpedBottomHierarchy;
 @property (nonatomic, copy) NSString *loggedCandidateSignature;
 + (instancetype)shared;
 - (void)start;
+- (void)writeDiagState:(NSString *)state;
 - (void)reloadPrefs;
 - (void)styleTabBar:(UITabBar *)bar;
 - (void)styleCustomBar:(UIView *)bar items:(NSArray<UIView *> *)items;
@@ -131,8 +173,11 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 - (void)handlePan:(UIPanGestureRecognizer *)pan;
 - (void)customItemTapped:(UIControl *)sender;
 - (void)scanTick:(NSTimer *)timer;
-- (UIView *)pillBackgroundInBar:(UIView *)bar frame:(CGRect)frame;
-- (UIView *)indicatorInBar:(UIView *)bar;
+- (UIView *)pillBackgroundInBar:(UIView *)bar frame:(CGRect)frame belowItems:(NSArray<UIView *> *)items;
+- (UIView *)indicatorInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items;
+- (NSInteger)glassInsertIndexInBar:(UIView *)bar items:(NSArray<UIView *> *)items;
+- (void)placeGlassViewsInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items;
+- (void)refreshIndicator:(UIView *)ind;
 - (CGRect)indicatorFrameForItemFrame:(CGRect)itemFrame barHeight:(CGFloat)barHeight bottomInset:(CGFloat)bottomInset;
 - (void)attachPanToBar:(UIView *)bar;
 - (void)hapticTick;
@@ -171,8 +216,18 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     return self;
 }
 
+- (void)writeDiagState:(NSString *)state {
+    if (!state || [state isEqualToString:self.diagState]) return;
+    self.diagState = state;
+    LGBDiagWrite(@"diag_barState", state);
+}
+
 - (void)start {
+    LGBDiagWrite(@"diag_lastLoadAt", LGBNowString());
+    LGBDiagWrite(@"diag_process", [[NSBundle mainBundle] bundleIdentifier] ?: @"?");
+    [self writeDiagState:@"Da nap vao Messenger, dang quet thanh bar..."];
     LGBLog(@"Khoi dong trong process %@ (enabled=%d)", [[NSBundle mainBundle] bundleIdentifier], pEnabled);
+    LGBLog(@"Duong dan log: %@", LGBLogFilePath());
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(appDidBecomeActive:)
                                                  name:UIApplicationDidBecomeActiveNotification
@@ -193,7 +248,46 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 }
 
 // ---------------------------------------------------------- tiện ích chung
-- (UIView *)pillBackgroundInBar:(UIView *)bar frame:(CGRect)frame {
+// Vị trí chèn lớp kính: ngay DƯỚI mục đầu tiên của bar. Bản 1.0.x chèn ở
+// index 0/1 nên bị lớp nền đặc của thanh bar Messenger đè lên che mất —
+// kéo vẫn chạy (gesture gắn trên bar), icon vẫn đổi màu (icon ở lớp trên
+// cùng), riêng kính thì không thấy. Từ 1.1.0: kính nằm TRÊN mọi lớp nền
+// của bar nhưng DƯỚI các mục.
+- (NSInteger)glassInsertIndexInBar:(UIView *)bar items:(NSArray<UIView *> *)items {
+    for (UIView *item in items) {
+        if (item.superview == bar) return (NSInteger)[bar.subviews indexOfObject:item];
+    }
+    return 0;
+}
+
+- (void)placeGlassViewsInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items {
+    if (!bar || items.count == 0) return;
+    UIView *pill = [bar viewWithTag:LGB_BG_TAG];
+    UIView *ind = [bar viewWithTag:LGB_INDICATOR_TAG];
+    if (pill && pill.superview != bar) pill = nil;
+    if (ind && ind.superview != bar) ind = nil;
+    if (!pill && !ind) return;
+    UIView *firstItem = nil;
+    for (UIView *item in items) {
+        if (item.superview == bar) { firstItem = item; break; }
+    }
+    if (!firstItem) return;
+    NSInteger firstIdx = (NSInteger)[bar.subviews indexOfObject:firstItem];
+    NSInteger pillIdx = pill ? (NSInteger)[bar.subviews indexOfObject:pill] : NSNotFound;
+    NSInteger indIdx = ind ? (NSInteger)[bar.subviews indexOfObject:ind] : NSNotFound;
+    // Đúng chỗ rồi thì thôi, tránh chèn đi chèn lại gây vòng lặp layout:
+    // thứ tự phải là [..., pill, indicator, mục đầu tiên, ...] liền nhau.
+    BOOL pillOK = (pillIdx != NSNotFound && pillIdx < firstIdx && (firstIdx - pillIdx) <= 2);
+    BOOL indOK = (!ind || indIdx == pillIdx + 1 || (pillIdx == NSNotFound && indIdx == firstIdx - 1));
+    if (pillOK && indOK) return;
+    if (pill) [pill removeFromSuperview];
+    if (ind) [ind removeFromSuperview];
+    firstIdx = (NSInteger)[bar.subviews indexOfObject:firstItem];
+    if (pill) [bar insertSubview:pill atIndex:firstIdx];
+    if (ind) [bar insertSubview:ind atIndex:firstIdx + (pill ? 1 : 0)];
+}
+
+- (UIView *)pillBackgroundInBar:(UIView *)bar frame:(CGRect)frame belowItems:(NSArray<UIView *> *)items {
     UIView *existing = [bar viewWithTag:LGB_BG_TAG];
     if (existing) {
         existing.frame = frame;
@@ -202,12 +296,14 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
             if ([sub isKindOfClass:[UIVisualEffectView class]]) { fx = (UIVisualEffectView *)sub; break; }
         }
         if (fx) {
+            fx.layer.cornerRadius = frame.size.height / 2.0;
             for (UIView *sub in fx.contentView.subviews) {
-                sub.backgroundColor = [LGBGlassTintColor() colorWithAlphaComponent:0.10];
+                sub.backgroundColor = [LGBGlassTintColor() colorWithAlphaComponent:0.14];
                 sub.frame = fx.bounds;
             }
             fx.alpha = pGlassAlpha;
         }
+        [self placeGlassViewsInBar:bar belowItems:items];
         return existing;
     }
     UIView *holder = [[UIView alloc] initWithFrame:frame];
@@ -220,30 +316,80 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     fx.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     fx.layer.cornerRadius = frame.size.height / 2.0;
     fx.layer.masksToBounds = YES;
-    fx.layer.borderWidth = 0.7;
-    fx.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.28].CGColor;
+    fx.layer.borderWidth = 0.8;
+    fx.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
     fx.alpha = pGlassAlpha;
     UIView *tint = [[UIView alloc] initWithFrame:fx.bounds];
     tint.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    tint.backgroundColor = [LGBGlassTintColor() colorWithAlphaComponent:0.10];
+    tint.backgroundColor = [LGBGlassTintColor() colorWithAlphaComponent:0.14];
     tint.userInteractionEnabled = NO;
     [fx.contentView addSubview:tint];
     [holder addSubview:fx];
-    [bar insertSubview:holder atIndex:0];
+    NSInteger idx = [self glassInsertIndexInBar:bar items:items];
+    [bar insertSubview:holder atIndex:idx];
     return holder;
 }
 
-- (UIView *)indicatorInBar:(UIView *)bar {
+// Cục glass chọn: từ 1.1.0 là kính TRẮNG MỜ SÁNG như clip mẫu (blur +
+// lớp trắng + nhuộm nhẹ màu chọn + viền sáng + bóng đổ), thay cho lớp
+// màu chọn alpha 0,25 gần như vô hình trên nền tối ở bản cũ.
+- (void)refreshIndicator:(UIView *)ind {
+    if (!ind) return;
+    ind.backgroundColor = [UIColor clearColor];
+    ind.layer.shadowColor = [UIColor blackColor].CGColor;
+    ind.layer.shadowOpacity = 0.25;
+    ind.layer.shadowRadius = 8.0;
+    ind.layer.shadowOffset = CGSizeMake(0, 2);
+    ind.layer.cornerRadius = ind.bounds.size.height / 2.0;
+    for (UIView *sub in ind.subviews) {
+        if (![sub isKindOfClass:[UIVisualEffectView class]]) continue;
+        UIVisualEffectView *fx = (UIVisualEffectView *)sub;
+        fx.layer.cornerRadius = ind.bounds.size.height / 2.0;
+        fx.alpha = 1.0;
+        for (UIView *s2 in fx.contentView.subviews) {
+            if (s2.tag == LGB_TINT_WHITE_TAG) {
+                s2.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.20];
+            } else if (s2.tag == LGB_TINT_COLOR_TAG) {
+                s2.backgroundColor = [LGBSelectedColor() colorWithAlphaComponent:0.22];
+            }
+        }
+    }
+}
+
+- (UIView *)indicatorInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items {
     UIView *ind = [bar viewWithTag:LGB_INDICATOR_TAG];
-    if (ind) return ind;
+    if (ind) {
+        [self placeGlassViewsInBar:bar belowItems:items];
+        return ind;
+    }
     ind = [[UIView alloc] initWithFrame:CGRectZero];
     ind.tag = LGB_INDICATOR_TAG;
     ind.userInteractionEnabled = NO;
-    ind.backgroundColor = [LGBSelectedColor() colorWithAlphaComponent:0.25];
-    ind.layer.borderWidth = 0.7;
-    ind.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.22].CGColor;
-    NSInteger idx = MIN((NSInteger)1, (NSInteger)bar.subviews.count);
+    ind.backgroundColor = [UIColor clearColor];
+
+    UIVisualEffectView *fx = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial]];
+    fx.frame = ind.bounds;
+    fx.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    fx.layer.masksToBounds = YES;
+    fx.layer.borderWidth = 0.9;
+    fx.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.38].CGColor;
+    UIView *white = [[UIView alloc] initWithFrame:fx.bounds];
+    white.tag = LGB_TINT_WHITE_TAG;
+    white.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    white.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.20];
+    white.userInteractionEnabled = NO;
+    [fx.contentView addSubview:white];
+    UIView *colorTint = [[UIView alloc] initWithFrame:fx.bounds];
+    colorTint.tag = LGB_TINT_COLOR_TAG;
+    colorTint.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    colorTint.backgroundColor = [LGBSelectedColor() colorWithAlphaComponent:0.22];
+    colorTint.userInteractionEnabled = NO;
+    [fx.contentView addSubview:colorTint];
+    [ind addSubview:fx];
+
+    NSInteger idx = [self glassInsertIndexInBar:bar items:items];
     [bar insertSubview:ind atIndex:idx];
+    [self placeGlassViewsInBar:bar belowItems:items];
     return ind;
 }
 
@@ -314,21 +460,23 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (pillH < 34.0) pillH = MAX(30.0, bar.bounds.size.height - bottomInset - 4.0);
     CGRect pillFrame = CGRectMake(14, (bar.bounds.size.height - bottomInset - pillH) / 2.0,
                                   bar.bounds.size.width - 28, pillH);
-    [self pillBackgroundInBar:bar frame:pillFrame];
-
     NSArray<UIView *> *buttons = [self tabBarButtons:bar];
+    [self pillBackgroundInBar:bar frame:pillFrame belowItems:buttons];
+
     if (buttons.count == 0 || bar.items.count == 0) return;
     NSInteger sel = bar.selectedItem ? (NSInteger)[bar.items indexOfObject:bar.selectedItem] : 0;
     if (sel == NSNotFound) sel = 0;
     if (sel >= (NSInteger)buttons.count) sel = (NSInteger)buttons.count - 1;
-    UIView *ind = [self indicatorInBar:bar];
-    ind.backgroundColor = [LGBSelectedColor() colorWithAlphaComponent:0.25];
+    UIView *ind = [self indicatorInBar:bar belowItems:buttons];
     CGRect target = [self indicatorFrameForItemFrame:buttons[sel].frame
                                           barHeight:bar.bounds.size.height
                                         bottomInset:bottomInset];
     if (self.previewIndex < 0) ind.frame = target; // đang kéo thì handlePan tự đặt frame
     ind.layer.cornerRadius = target.size.height / 2.0;
+    [self refreshIndicator:ind];
     [self attachPanToBar:bar];
+    [self writeDiagState:[NSString stringWithFormat:@"Da thay UITabBar chuan (%lu muc) — da ap kinh",
+                          (unsigned long)bar.items.count]];
 }
 
 - (void)tabBarSelectionChanged:(UITabBar *)bar {
@@ -342,7 +490,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (win && CGRectGetMaxY([bar convertRect:bar.bounds toView:win]) >= win.bounds.size.height - 1.0) {
         bottomInset = win.safeAreaInsets.bottom;
     }
-    UIView *ind = [self indicatorInBar:bar];
+    UIView *ind = [self indicatorInBar:bar belowItems:buttons];
     CGRect target = [self indicatorFrameForItemFrame:buttons[sel].frame
                                           barHeight:bar.bounds.size.height
                                         bottomInset:bottomInset];
@@ -399,8 +547,8 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     for (NSInteger i = 0; i < (NSInteger)self.customItems.count; i++) {
         [self tintTree:self.customItems[i] color:(i == active ? sel : unsel) selected:(i == active)];
     }
-    UIView *ind = [self indicatorInBar:self.customBar];
-    ind.backgroundColor = [sel colorWithAlphaComponent:0.25];
+    UIView *ind = [self indicatorInBar:self.customBar belowItems:self.customItems];
+    [self refreshIndicator:ind];
 }
 
 - (void)styleCustomBar:(UIView *)bar items:(NSArray<UIView *> *)items {
@@ -419,14 +567,15 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (pillH < 34.0) pillH = MAX(30.0, bar.bounds.size.height - bottomInset - 4.0);
     CGRect pillFrame = CGRectMake(14, (bar.bounds.size.height - bottomInset - pillH) / 2.0,
                                   bar.bounds.size.width - 28, pillH);
-    [self pillBackgroundInBar:bar frame:pillFrame];
+    [self pillBackgroundInBar:bar frame:pillFrame belowItems:items];
 
-    UIView *ind = [self indicatorInBar:bar];
+    UIView *ind = [self indicatorInBar:bar belowItems:items];
     CGRect target = [self indicatorFrameForItemFrame:items[self.customSelectedIndex].frame
                                           barHeight:bar.bounds.size.height
                                         bottomInset:bottomInset];
     if (self.previewIndex < 0) ind.frame = target;
     ind.layer.cornerRadius = target.size.height / 2.0;
+    [self refreshIndicator:ind];
     [self applyCustomSelectionVisual];
     [self attachPanToBar:bar];
 
@@ -447,6 +596,8 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
             LGBLog(@"Da ap kinh len bar tu che: %@ (frame %@, %lu muc)",
                    sig, NSStringFromCGRect(bar.frame), (unsigned long)items.count);
         }
+        [self writeDiagState:[NSString stringWithFormat:@"Da thay bar tu che %@ (%lu muc) — da ap kinh",
+                              NSStringFromClass([bar class]), (unsigned long)items.count]];
     }
 }
 
@@ -490,7 +641,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (win && CGRectGetMaxY([self.customBar convertRect:self.customBar.bounds toView:win]) >= win.bounds.size.height - 1.0) {
         bottomInset = win.safeAreaInsets.bottom;
     }
-    UIView *ind = [self indicatorInBar:self.customBar];
+    UIView *ind = [self indicatorInBar:self.customBar belowItems:self.customItems];
     CGRect target = [self indicatorFrameForItemFrame:self.customItems[self.customSelectedIndex].frame
                                           barHeight:self.customBar.bounds.size.height
                                         bottomInset:bottomInset];
@@ -529,7 +680,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     CGFloat clampedX = MIN(MAX(x, minX), maxX);
     NSInteger nearIdx = [self nearestIndex:clampedX centers:centers];
 
-    UIView *ind = [self indicatorInBar:bar];
+    UIView *ind = [self indicatorInBar:bar belowItems:items];
     CGFloat bottomInset = 0;
     UIWindow *win = bar.window;
     if (win && CGRectGetMaxY([bar convertRect:bar.bounds toView:win]) >= win.bounds.size.height - 1.0) {
@@ -578,7 +729,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (win && CGRectGetMaxY([bar convertRect:bar.bounds toView:win]) >= win.bounds.size.height - 1.0) {
         bottomInset = win.safeAreaInsets.bottom;
     }
-    UIView *ind = [self indicatorInBar:bar];
+    UIView *ind = [self indicatorInBar:bar belowItems:items];
     CGRect target = [self indicatorFrameForItemFrame:items[idx].frame
                                           barHeight:bar.bounds.size.height
                                         bottomInset:bottomInset];
@@ -666,7 +817,11 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     CGFloat w = v.bounds.size.width, h = v.bounds.size.height;
     BOOL inBottom = CGRectGetMaxY(inWin) > win.bounds.size.height - 150.0;
     BOOL sizeOK = (h >= 40 && h <= 115 && w > win.bounds.size.width * 0.6);
-    if (inBottom && sizeOK && v.subviews.count >= 3 && v.subviews.count <= 8) {
+    NSInteger rawCount = 0; // không đếm 2 lớp kính của tweak khi quét lại bar đã áp kính
+    for (UIView *sub in v.subviews) {
+        if (sub.tag != LGB_BG_TAG && sub.tag != LGB_INDICATOR_TAG) rawCount++;
+    }
+    if (inBottom && sizeOK && rawCount >= 3 && rawCount <= 8) {
         NSMutableArray<UIView *> *items = [NSMutableArray array];
         for (UIView *sub in v.subviews) {
             if (sub.tag == LGB_BG_TAG || sub.tag == LGB_INDICATOR_TAG) continue;
@@ -702,6 +857,14 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 - (void)scanTick:(NSTimer *)timer {
     (void)timer;
     if (!pEnabled) return;
+    self.scanCount++;
+    if (self.scanCount % 10 == 1) {
+        LGBDiagWrite(@"diag_scanCount", @(self.scanCount));
+        if (!self.tabBar && !self.customBar) {
+            [self writeDiagState:[NSString stringWithFormat:@"Da nap nhung CHUA thay thanh bar nao (da quet %ld lan)",
+                                  (long)self.scanCount]];
+        }
+    }
     // Đã có UITabBar chuẩn đang được áp kính thì khỏi quét đường B.
     if (self.tabBar && self.tabBar.window) return;
     if (self.customBar && self.customBar.window) {
