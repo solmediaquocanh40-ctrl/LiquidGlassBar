@@ -12,7 +12,7 @@
 			<key>label</key>
 			<string>CHUNG</string>
 			<key>footerText</key>
-			<string>Bản 1.1.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
+			<string>Bản 1.2.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -80,11 +80,99 @@
 			<key>key</key>
 			<string>glassAlpha</string>
 			<key>label</key>
-			<string>Độ rõ của kính</string>
+			<string>Độ rõ kính nền bar</string>
 			<key>min</key>
 			<real>0.3</real>
 			<key>max</key>
 			<real>1.0</real>
+			<key>showValue</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.95</real>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>blobAlpha</string>
+			<key>label</key>
+			<string>Độ rõ cục glass chọn</string>
+			<key>min</key>
+			<real>0.3</real>
+			<key>max</key>
+			<real>1.0</real>
+			<key>showValue</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>KÍCH THƯỚC GLASS</string>
+			<key>footerText</key>
+			<string>Kích thước tính theo % của ô mục thật (gồm cả chữ dưới icon). 100% là vừa khít ô. Lề nền là khoảng hở hai bên của viên thuốc kính so với mép thanh bar (pt).</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>100</real>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>blobWidthPct</string>
+			<key>label</key>
+			<string>Chiều rộng cục glass (%)</string>
+			<key>min</key>
+			<real>70</real>
+			<key>max</key>
+			<real>130</real>
+			<key>showValue</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>100</real>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>blobHeightPct</string>
+			<key>label</key>
+			<string>Chiều cao cục glass (%)</string>
+			<key>min</key>
+			<real>60</real>
+			<key>max</key>
+			<real>120</real>
+			<key>showValue</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>8</real>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>pillInset</string>
+			<key>label</key>
+			<string>Lề viên thuốc nền (pt)</string>
+			<key>min</key>
+			<real>0</real>
+			<key>max</key>
+			<real>24</real>
 			<key>showValue</key>
 			<true/>
 			<key>PostNotification</key>
@@ -166,7 +254,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>LiquidGlassBar 1.1.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, chụp màn hình ở nút chẩn đoán phía trên và gửi kèm file log LiquidGlassBar.log (trong Documents của Messenger).</string>
+			<string>LiquidGlassBar 1.2.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, chụp màn hình ở nút chẩn đoán phía trên và gửi kèm file log LiquidGlassBar.log (trong Documents của Messenger).</string>
 		</dict>
 	</array>
 </dict>
