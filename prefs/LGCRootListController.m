@@ -76,6 +76,26 @@ static NSString *LGCHexFromColor(UIColor *color) {
     [self reloadSpecifiers];
 }
 
+- (void)showDiagnostics:(id)sender {
+    (void)sender;
+    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:LGC_DOMAIN];
+    NSString *last = [defaults stringForKey:@"diag_lastLoadAt"];
+    NSString *state = [defaults stringForKey:@"diag_barState"];
+    NSNumber *scans = [defaults objectForKey:@"diag_scanCount"];
+    NSString *msg = nil;
+    if (!last) {
+        msg = @"Chưa ghi nhận lần nạp nào.\n\nNghĩa là tweak CHƯA chạy vào trong Messenger. Kiểm tra: đã tắt hẳn Messenger trong đa nhiệm rồi mở lại chưa; trong app Dopamine phần nạp tweak có đang bật không; nếu có Choicy thì Messenger có bị tắt nạp tweak không.\n\nChụp màn hình thông báo này gửi lại nếu vẫn không nạp được.";
+    } else {
+        msg = [NSString stringWithFormat:@"Lần nạp gần nhất: %@\n\nTrạng thái thanh bar: %@\n\nSố lần quét tìm bar: %@",
+               last, state ?: @"(chưa có)", scans ?: @0];
+    }
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Trạng thái LiquidGlassBar"
+                                                                   message:msg
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)saveColor:(UIColor *)color postNotification:(BOOL)postNotification {
     if (!self.activeColorKey || !color) return;
     NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:LGC_DOMAIN];

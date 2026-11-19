@@ -12,7 +12,7 @@
 			<key>label</key>
 			<string>CHUNG</string>
 			<key>footerText</key>
-			<string>Bản 1.0.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
+			<string>Bản 1.0.1: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -142,15 +142,31 @@
 			<key>key</key>
 			<string>debug</string>
 			<key>label</key>
-			<string>Ghi log gỡ lỗi (Documents/LiquidGlassBar.log)</string>
+			<string>Ghi log gỡ lỗi (LiquidGlassBar.log trong Documents của Messenger)</string>
 			<key>PostNotification</key>
 			<string>com.vn.liquidglassbar/prefsChanged</string>
 		</dict>
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>CHẨN ĐOÁN</string>
 			<key>footerText</key>
-			<string>LiquidGlassBar 1.0.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, gửi file log ở Documents/LiquidGlassBar.log để xem cấu trúc bar của Messenger trên máy.</string>
+			<string>Tweak tự ghi lại dấu vết mỗi lần được nạp vào Messenger. Bấm nút dưới để xem: đã nạp lần nào chưa, đã thấy thanh bar chưa. File log chi tiết nằm trong thư mục Documents của chính Messenger — mở Filza, tìm kiếm toàn máy "LiquidGlassBar.log" là thấy.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>Xem trạng thái nạp tweak</string>
+			<key>action</key>
+			<string>showDiagnostics:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>LiquidGlassBar 1.0.1 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, chụp màn hình ở nút chẩn đoán phía trên và gửi kèm file log LiquidGlassBar.log (trong Documents của Messenger).</string>
 		</dict>
 	</array>
 </dict>
