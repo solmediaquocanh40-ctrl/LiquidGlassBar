@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>title</key>
+	<string>LiquidGlassBar</string>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>CHUNG</string>
+			<key>footerText</key>
+			<string>Bản 1.0.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>enabled</string>
+			<key>label</key>
+			<string>Bật LiquidGlassBar</string>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>MÀU SẮC</string>
+			<key>footerText</key>
+			<string>Icon của mục đang chọn sẽ đổi sang màu này (mặc định xanh Messenger #0084FF). Cục đỏ số tin chưa đọc giữ nguyên, không bị đổi màu.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>cellClass</key>
+			<string>LGCColorCell</string>
+			<key>label</key>
+			<string>Màu icon khi được chọn</string>
+			<key>colorKey</key>
+			<string>selectedColorHex</string>
+			<key>defaultHex</key>
+			<string>#0084FF</string>
+			<key>action</key>
+			<string>openSelectedColorPicker:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>cellClass</key>
+			<string>LGCColorCell</string>
+			<key>label</key>
+			<string>Màu nhuộm kính</string>
+			<key>colorKey</key>
+			<string>glassTintHex</string>
+			<key>defaultHex</key>
+			<string>#FFFFFF</string>
+			<key>action</key>
+			<string>openGlassTintColorPicker:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>KÍNH</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>default</key>
+			<real>0.85</real>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>glassAlpha</string>
+			<key>label</key>
+			<string>Độ rõ của kính</string>
+			<key>min</key>
+			<real>0.3</real>
+			<key>max</key>
+			<real>1.0</real>
+			<key>showValue</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>KÉO TRƯỢT</string>
+			<key>footerText</key>
+			<string>Chạm giữ trên thanh bar rồi kéo ngang: cục glass bám theo tay, qua mỗi mục rung nhẹ một cái (nếu bật rung), thả tay ra là chọn mục gần nhất. Chạm từng mục vẫn dùng như bình thường.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>dragEnabled</string>
+			<key>label</key>
+			<string>Cho kéo glass để chọn mục</string>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>haptics</string>
+			<key>label</key>
+			<string>Rung nhẹ khi glass qua mục mới</string>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>KHÁC</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>debug</string>
+			<key>label</key>
+			<string>Ghi log gỡ lỗi (Documents/LiquidGlassBar.log)</string>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>LiquidGlassBar 1.0.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, gửi file log ở Documents/LiquidGlassBar.log để xem cấu trúc bar của Messenger trên máy.</string>
+		</dict>
+	</array>
+</dict>
+</plist>
