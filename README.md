@@ -1,8 +1,49 @@
-# LiquidGlassBar 1.0.0
+# LiquidGlassBar 1.3.0
 
-Thanh tab bar kiểu **Liquid Glass cho Messenger** (bản 1.0.0: chỉ Messenger —
+Thanh tab bar kiểu **Liquid Glass cho Messenger** (chỉ Messenger —
 test ổn mới mở rộng ra các app khác ở bản sau, kèm trang List app để bật
 từng app).
+
+Bản 1.3.0 (theo test máy thật của 1.2.0): (1) glass đo theo **tổng
+khung icon + chữ** (kể cả chữ nằm ngoài/tách khỏi ô icon) nên bao trọn
+chữ; (2) **blur sống trở lại** trong cục glass + asset chỉnh trong hơn
+để nhìn xuyên qua và mờ nội dung phía sau như ảnh mẫu; (3) di chuyển
+bằng **transform** thay cho đổi frame nên kéo mượt, hết khựng; (4) thêm
+slider **độ nảy khi thả** và **độ giãn khi kéo**; (5) sửa vụ thông số
+không áp dụng: tweak **nạp lại prefs mỗi 1,5 giây** và mỗi lần app được
+mở lại, không phụ thuộc tín hiệu báo thay đổi; (6) trang Cài đặt có
+**khung xem trước trực quan** vẽ bằng đúng bộ kính, đổi tuỳ chọn là
+khung đổi theo ngay. LƯU Ý: bản này phải đẩy ĐỦ file (đặc biệt
+Root.plist và 2 file LGCPreviewCell mới) — thiếu file là Cài đặt không
+hiện slider/preview mới.
+
+Bản 1.2.0 (theo test máy thật của 1.1.0: kính đã hiện nhưng chưa đẹp,
+kéo bị khựng rồi nhảy, glass lệch và nhỏ hơn ô mục): (1) **asset kính
+vẽ sẵn** bằng code — gradient có chiều sâu, quầng sáng, vệt bóng gương,
+viền sáng — đắp lên lớp blur của viên thuốc nền; (2) **kéo mượt**:
+cục glass bỏ blur sống bên trong, bóng đổ có shadowPath, cử chỉ đổi
+sang nhận diện tức thì (chạm di chuyển 4pt mới tính là kéo, chạm thường
+không đổi), đang kéo thì glass giãn nhẹ theo tốc độ, thả ra co lại;
+(3) **kích thước đo theo ô mục thật** (gồm cả chữ) và kẹp gọn trong
+viên thuốc nền, nền đo theo vùng nội dung thật của bar; (4) Cài đặt
+thêm: độ rõ riêng cho cục glass, chiều rộng/cao cục glass (%), lề
+viên thuốc nền.
+
+Bản 1.1.0 sửa **kính không hiện** (test máy thật của 1.0.1: kéo được,
+icon đổi màu được, nhưng không thấy kính): hai lớp kính ở bản cũ chèn ở
+đáy chồng view nên bị lớp nền đặc của thanh bar Messenger che mất. Nay
+kính được nâng lên nằm **trên mọi lớp nền của bar, ngay dưới các mục**,
+và cục glass chọn đổi sang kiểu **kính trắng mờ sáng** (blur + lớp trắng
++ nhuộm nhẹ màu chọn + viền sáng + bóng đổ) như clip mẫu, thay cho lớp
+màu chọn alpha 0,25 cũ. Phần kéo trượt + đổi màu (đã chạy tốt) giữ nguyên.
+
+Bản 1.0.1 là bản **chẩn đoán khâu nạp**: bản 1.0.0 cài trên máy thật thì
+Cài đặt hiện, công tắc bật được, nhưng Messenger không áp kính và không
+có file log — vì log ghi ra `/var/mobile/Documents` bị sandbox của
+Messenger chặn, và chưa phân biệt được tweak đã nạp vào app hay chưa.
+Bản này sửa cả hai: log ghi vào Documents của chính Messenger, và tweak
+tự ghi "dấu vết đã nạp + trạng thái quét bar" vào miền cài đặt (đọc lại
+bằng nút **Xem trạng thái nạp tweak** trong Cài đặt → LiquidGlassBar).
 
 ## Tính năng
 
@@ -37,9 +78,11 @@ roothide.
 2. Kéo ngang trên thanh bar: glass trượt theo tay, thả ra chọn mục.
 3. Đổi màu icon trong Cài đặt → mở lại Messenger: icon mục đang chọn đổi màu.
 4. Nhờ người khác nhắn tin tới: cục đỏ số chưa đọc vẫn hiện bình thường.
-5. Nếu bar chưa thành kính hoặc kéo không ăn: lấy file
-   `Documents/LiquidGlassBar.log` gửi lại — trong log có cây view vùng đáy
-   và class của thanh bar Messenger để chỉnh vòng sau.
+5. Nếu bar chưa thành kính: vào Cài đặt → LiquidGlassBar → **Xem trạng
+   thái nạp tweak**, chụp màn hình thông báo đó. Kèm file log: mở Filza,
+   tìm kiếm toàn máy `LiquidGlassBar.log` (file nằm trong thư mục
+   Documents của chính Messenger) rồi gửi lại — trong log có cây view
+   vùng đáy và class của thanh bar Messenger để chỉnh vòng sau.
 
 ## Giới hạn đã biết của bản 1.0.0
 
