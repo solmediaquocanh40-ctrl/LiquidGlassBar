@@ -1,8 +1,27 @@
-# LiquidGlassBar 1.3.0
+# LiquidGlassBar 1.4.0
 
 Thanh tab bar kiểu **Liquid Glass cho Messenger** (chỉ Messenger —
 test ổn mới mở rộng ra các app khác ở bản sau, kèm trang List app để bật
 từng app).
+
+Bản 1.4.0: thêm **lớp kính shader** (file `LGBGlassShader.h` dùng chung
+cho tweak và trang Cài đặt): vệt sáng viền + quầng sáng mặt kính vẽ bằng
+Metal, phỏng theo phần toán của shader `GlassBackground17.metal` trong
+gói **LiquidGlaze** (com.zege.liquidglaze của tác giả zege — hàm
+highlight theo SDF của QuartzCore và falloff cầu; SDF viên thuốc ở đây
+tính giải tích, không dùng texture SDF như bản gốc). Lớp shader chỉ vẽ
+phần SÁNG đè lên blur sống sẵn có — trong tiến trình app bên thứ ba
+không lấy được texture hậu cảnh của render server nên không làm khúc
+xạ thật như đường ống cấp hệ thống của LiquidGlaze; độ giống kỳ vọng
+~80–85%. Shader **biên dịch sẵn lúc nạp** ở luồng nền, mỗi kích thước
+chỉ render 1 ảnh tĩnh có lưu đệm, cục glass vẫn di chuyển bằng
+transform → không thêm chi phí theo khung hình, không khựng khi kéo.
+Có công tắc **"Kính shader"** trong Cài đặt: tắt là lùi về đúng kính
+1.3.0; nếu Metal lỗi, tweak cũng tự lùi và ghi "FAIL" ở nút chẩn đoán
+(khoá `diag_shaderGlass`). Khung xem trước trong Cài đặt cũng vẽ lớp
+shader này. LƯU Ý: bản này phải đẩy ĐỦ file — có thêm 2 file mới
+`tweak/LGBGlassShader.h` và `prefs/LGBGlassShader.h`, và Root.plist có
+thêm công tắc `shaderGlass` (tổng 14 khoá prefs).
 
 Bản 1.3.0 (theo test máy thật của 1.2.0): (1) glass đo theo **tổng
 khung icon + chữ** (kể cả chữ nằm ngoài/tách khỏi ô icon) nên bao trọn
@@ -68,7 +87,7 @@ bằng nút **Xem trạng thái nạp tweak** trong Cài đặt → LiquidGlassB
 ## Build
 
 Đẩy toàn bộ cây này lên GitHub, kèm file workflow riêng
-`build-liquidglassbar-1.0.0.yml` vào `.github/workflows/build.yml`
+`build-liquidglassbar-1.4.0.yml` vào `.github/workflows/build.yml`
 (commit mới — đừng bấm Re-run bản cũ). CI build 3 bản: rootful, rootless,
 roothide.
 

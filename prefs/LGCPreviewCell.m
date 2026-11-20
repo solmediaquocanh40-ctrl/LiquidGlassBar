@@ -1,5 +1,6 @@
 #import "LGCPreviewCell.h"
 #import <QuartzCore/QuartzCore.h>
+#import "LGBGlassShader.h"
 
 static NSString *const LGC_DOMAIN = @"com.vn.liquidglassbar";
 static NSString *const LGC_PREFS_NOTIFICATION = @"com.vn.liquidglassbar/prefsChanged";
@@ -99,9 +100,11 @@ static UIImage *LGCGlassImageForSize(CGSize size) {
 @property (nonatomic, strong) UIVisualEffectView *pillFx;
 @property (nonatomic, strong) UIView *pillTint;
 @property (nonatomic, strong) UIImageView *pillAsset;
+@property (nonatomic, strong) UIImageView *pillSpec;
 @property (nonatomic, strong) UIVisualEffectView *blobFx;
 @property (nonatomic, strong) UIView *blobTint;
 @property (nonatomic, strong) UIImageView *blobAsset;
+@property (nonatomic, strong) UIImageView *blobSpec;
 @property (nonatomic, strong) NSArray<UIImageView *> *iconViews;
 @property (nonatomic, strong) NSArray<UILabel *> *labelViews;
 @property (nonatomic, copy) NSString *lastHash;
@@ -175,6 +178,9 @@ static void LGCPreviewPrefsChanged(CFNotificationCenterRef center, void *observe
     self.pillAsset = [[UIImageView alloc] initWithFrame:CGRectZero];
     self.pillAsset.userInteractionEnabled = NO;
     [self.stageView addSubview:self.pillAsset];
+    self.pillSpec = [[UIImageView alloc] initWithFrame:CGRectZero];
+    self.pillSpec.userInteractionEnabled = NO;
+    [self.stageView addSubview:self.pillSpec];
 
     self.blobFx = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial]];
     self.blobFx.layer.masksToBounds = YES;
@@ -187,6 +193,18 @@ static void LGCPreviewPrefsChanged(CFNotificationCenterRef center, void *observe
     self.blobAsset = [[UIImageView alloc] initWithFrame:CGRectZero];
     self.blobAsset.userInteractionEnabled = NO;
     [self.stageView addSubview:self.blobAsset];
+    self.blobSpec = [[UIImageView alloc] initWithFrame:CGRectZero];
+    self.blobSpec.userInteractionEnabled = NO;
+    [self.stageView addSubview:self.blobSpec];
+
+    // Biên dịch sẵn shader kính ở luồng nền để khung xem trước hiện
+    // lớp vệt sáng ngay, không phải chờ biên dịch ở lần refresh đầu.
+    static dispatch_once_t warmOnce;
+    dispatch_once(&warmOnce, ^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            LGBGlassShaderWarmUp();
+        });
+    });
 
     NSArray<NSString *> *symbols = @[@"message.fill", @"person.2.fill", @"bell.fill", @"line.3.horizontal"];
     NSArray<NSString *> *names = @[@"Đoạn chat", @"Mọi người", @"Thông báo", @"Menu"];
@@ -227,9 +245,10 @@ static void LGCPreviewPrefsChanged(CFNotificationCenterRef center, void *observe
     CGFloat wPct = [d objectForKey:@"blobWidthPct"] ? (CGFloat)[d doubleForKey:@"blobWidthPct"] : 100.0;
     CGFloat hPct = [d objectForKey:@"blobHeightPct"] ? (CGFloat)[d doubleForKey:@"blobHeightPct"] : 100.0;
     CGFloat inset = [d objectForKey:@"pillInset"] ? (CGFloat)[d doubleForKey:@"pillInset"] : 8.0;
+    BOOL shaderOn = [d objectForKey:@"shaderGlass"] ? [d boolForKey:@"shaderGlass"] : YES;
 
-    NSString *hash = [NSString stringWithFormat:@"%@|%@|%.2f|%.2f|%.0f|%.0f|%.0f|%@",
-                      selHex, tintHex, glassAlpha, blobAlpha, wPct, hPct, inset,
+    NSString *hash = [NSString stringWithFormat:@"%@|%@|%.2f|%.2f|%.0f|%.0f|%.0f|%d|%@",
+                      selHex, tintHex, glassAlpha, blobAlpha, wPct, hPct, inset, shaderOn,
                       NSStringFromCGSize(self.stageView.bounds.size)];
     if ([hash isEqualToString:self.lastHash]) return;
     self.lastHash = hash;
@@ -259,7 +278,12 @@ static void LGCPreviewPrefsChanged(CFNotificationCenterRef center, void *observe
     self.pillTint.backgroundColor = [tintColor colorWithAlphaComponent:0.14];
     self.pillAsset.frame = pill;
     self.pillAsset.image = LGCGlassImageForSize(pill.size);
-    self.pillAsset.alpha = 0.55 * glassAlpha;
+    self.pillSpec.frame = pill;
+    self.pillSpec.image = shaderOn ? LGBSpecularImage(pill.size, [UIScreen mainScreen].scale, 0.8) : nil;
+    BOOL pillSpecOn = self.pillSpec.image != nil;
+    self.pillSpec.hidden = !pillSpecOn;
+    self.pillSpec.alpha = glassAlpha;
+    self.pillAsset.alpha = 0.55 * glassAlpha * (pillSpecOn ? 0.55 : 1.0);
 
     // các ô mục + cục glass ôm ô đầu tiên (icon + chữ)
     NSInteger n = 4;
@@ -289,7 +313,12 @@ static void LGCPreviewPrefsChanged(CFNotificationCenterRef center, void *observe
     self.blobTint.backgroundColor = [selColor colorWithAlphaComponent:0.18];
     self.blobAsset.frame = blob;
     self.blobAsset.image = LGCGlassImageForSize(blob.size);
-    self.blobAsset.alpha = blobAlpha;
+    self.blobSpec.frame = blob;
+    self.blobSpec.image = shaderOn ? LGBSpecularImage(blob.size, [UIScreen mainScreen].scale, 1.0) : nil;
+    BOOL blobSpecOn = self.blobSpec.image != nil;
+    self.blobSpec.hidden = !blobSpecOn;
+    self.blobSpec.alpha = blobAlpha;
+    self.blobAsset.alpha = blobAlpha * (blobSpecOn ? 0.55 : 1.0);
 }
 
 @end

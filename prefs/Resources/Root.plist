@@ -12,7 +12,7 @@
 			<key>label</key>
 			<string>CHUNG</string>
 			<key>footerText</key>
-			<string>Bản 1.3.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
+			<string>Bản 1.4.0: chỉ áp dụng cho Messenger. Thanh tab bar thành kính mờ dạng viên thuốc nổi, kéo cục glass trượt ngang để chọn mục. Bản này thêm lớp kính shader phỏng theo LiquidGlaze (xem mục Kính ở dưới). Đổi tuỳ chọn xong thì mở lại Messenger để áp dụng chắc chắn nhất.</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -85,6 +85,22 @@
 			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>KÍNH</string>
+			<key>footerText</key>
+			<string>Bật "Kính shader": thêm lớp vệt sáng viền + quầng sáng mặt kính vẽ bằng Metal (phỏng theo phần toán của shader trong gói LiquidGlaze) đè lên lớp mờ — kính ra chất "thật" hơn hẳn. Shader được biên dịch sẵn và mỗi kích thước chỉ vẽ 1 lần nên không làm khựng khi kéo. Tắt đi là quay về đúng lớp kính của bản 1.3.0.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.vn.liquidglassbar</string>
+			<key>key</key>
+			<string>shaderGlass</string>
+			<key>label</key>
+			<string>Kính shader (phong cách LiquidGlaze)</string>
+			<key>PostNotification</key>
+			<string>com.vn.liquidglassbar/prefsChanged</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -310,7 +326,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>LiquidGlassBar 1.3.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, chụp màn hình ở nút chẩn đoán phía trên và gửi kèm file log LiquidGlassBar.log (trong Documents của Messenger).</string>
+			<string>LiquidGlassBar 1.4.0 — made by Quoc. Phạm vi bản này: chỉ Messenger. Nếu thanh bar chưa thành kính, chụp màn hình ở nút chẩn đoán phía trên và gửi kèm file log LiquidGlassBar.log (trong Documents của Messenger).</string>
 		</dict>
 	</array>
 </dict>

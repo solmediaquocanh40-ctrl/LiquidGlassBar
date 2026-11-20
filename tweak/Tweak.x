@@ -1,6 +1,12 @@
-// LiquidGlassBar 1.3.0 — thanh tab bar kiểu Liquid Glass cho Messenger:
+// LiquidGlassBar 1.4.0 — thanh tab bar kiểu Liquid Glass cho Messenger:
 // nền kính mờ dạng viên thuốc nổi, cục glass chọn kéo trượt ngang qua lại
 // để chọn mục, icon của mục được chọn đổi sang màu tuỳ chọn trong Cài đặt.
+// Bản 1.4.0 thêm LỚP KÍNH SHADER (LGBGlassShader.h): vệt sáng viền +
+// quầng sáng mặt kính chạy bằng Metal, phỏng theo phần toán của shader
+// GlassBackground17 trong gói LiquidGlaze — đè lên blur sống sẵn có.
+// Shader biên dịch sẵn lúc nạp, mỗi kích thước chỉ render 1 ảnh tĩnh,
+// kéo vẫn bằng transform nên không thêm chi phí theo từng khung hình.
+// Tắt "Kính shader" trong Cài đặt là lùi về đúng kính của bản 1.3.0.
 //
 // Hai đường áp dụng:
 //  A) Thanh chuẩn UITabBar (hook trực tiếp, chắc nhất).
@@ -16,6 +22,7 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import "LGBGlassShader.h"
 
 static NSString *const LGB_DOMAIN = @"com.vn.liquidglassbar";
 static NSString *const LGB_PREFS_NOTIFICATION = @"com.vn.liquidglassbar/prefsChanged";
@@ -40,8 +47,10 @@ static const NSInteger LGB_BG_TAG = 712001;
 static const NSInteger LGB_INDICATOR_TAG = 712002;
 static const NSInteger LGB_TINT_COLOR_TAG = 712012;
 static const NSInteger LGB_ASSET_TAG = 712013;
+static const NSInteger LGB_SPEC_TAG = 712014;
 
 static BOOL pEnabled = YES;
+static BOOL pShaderGlass = YES;
 static BOOL pDragEnabled = YES;
 static BOOL pHaptics = YES;
 static BOOL pDebug = YES;
@@ -112,6 +121,7 @@ static NSString *LGBNowString(void) {
 
 static void LGBLoadPrefs(void) {
     pEnabled         = [LGBGetPref(@"enabled", @YES) boolValue];
+    pShaderGlass     = [LGBGetPref(@"shaderGlass", @YES) boolValue];
     pDragEnabled     = [LGBGetPref(@"dragEnabled", @YES) boolValue];
     pHaptics         = [LGBGetPref(@"haptics", @YES) boolValue];
     pDebug           = [LGBGetPref(@"debug", @YES) boolValue];
@@ -281,6 +291,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 - (UIView *)indicatorInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items;
 - (NSInteger)glassInsertIndexInBar:(UIView *)bar items:(NSArray<UIView *> *)items;
 - (void)placeGlassViewsInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items;
+- (BOOL)updateSpecularInHolder:(UIView *)holder size:(CGSize)size intensity:(CGFloat)intensity alpha:(CGFloat)alpha;
 - (void)refreshIndicator:(UIView *)ind;
 - (CGRect)pillFrameForBar:(UIView *)bar;
 - (CGRect)indicatorFrameForItemFrame:(CGRect)itemFrame limitRect:(CGRect)limit;
@@ -350,8 +361,8 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
 
 - (void)reloadPrefs {
     LGBLoadPrefs();
-    LGBLog(@"Nap lai prefs: enabled=%d drag=%d mauChon=%@ mauKinh=%@ alpha=%.2f blobAlpha=%.2f rong=%.0f%% cao=%.0f%% le=%.0f nay=%.0f gian=%.0f",
-           pEnabled, pDragEnabled, pSelectedColorHex, pGlassTintHex, pGlassAlpha,
+    LGBLog(@"Nap lai prefs: enabled=%d shader=%d drag=%d mauChon=%@ mauKinh=%@ alpha=%.2f blobAlpha=%.2f rong=%.0f%% cao=%.0f%% le=%.0f nay=%.0f gian=%.0f",
+           pEnabled, pShaderGlass, pDragEnabled, pSelectedColorHex, pGlassTintHex, pGlassAlpha,
            pBlobAlpha, pBlobWidthPct, pBlobHeightPct, pPillInset, pSpringPct, pStretchPct);
     if (self.tabBar) [self styleTabBar:self.tabBar];
     if (self.customBar) [self styleCustomBar:self.customBar items:self.customItems];
@@ -397,6 +408,41 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     if (ind) [bar insertSubview:ind atIndex:firstIdx + (pill ? 1 : 0)];
 }
 
+// Lớp vệt sáng shader (1.4.0): render 1 ảnh tĩnh cho đúng kích thước
+// rồi để UIImageView nằm trên cùng của holder (trên asset tĩnh). Trả về
+// YES nếu lớp shader đang hiện; khi đó asset tĩnh được giảm độ rõ để
+// hai lớp viền sáng không chồng lên nhau thành quá chói. Nơi gọi PHẢI
+// đặt alpha cho asset TRƯỚC khi gọi hàm này (mọi đường refresh hiện tại
+// đều vậy) để phép giảm không bị cộng dồn qua nhiều lần refresh.
+// Kéo trượt không đụng vào lớp này: nó là con của cục glass, đi theo
+// transform chung — không tốn thêm chi phí theo từng khung hình.
+- (BOOL)updateSpecularInHolder:(UIView *)holder size:(CGSize)size intensity:(CGFloat)intensity alpha:(CGFloat)alpha {
+    UIImageView *spec = (UIImageView *)[holder viewWithTag:LGB_SPEC_TAG];
+    UIImage *img = nil;
+    if (pShaderGlass && size.width >= 10 && size.height >= 10) {
+        img = LGBSpecularImage(size, [UIScreen mainScreen].scale, intensity);
+    }
+    if (!img) {
+        if (spec) spec.hidden = YES;
+        return NO;
+    }
+    if (!spec) {
+        spec = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, size.width, size.height)];
+        spec.tag = LGB_SPEC_TAG;
+        spec.userInteractionEnabled = NO;
+        spec.contentMode = UIViewContentModeScaleToFill;
+        [holder addSubview:spec];
+    }
+    spec.frame = CGRectMake(0, 0, size.width, size.height);
+    spec.image = img;
+    spec.alpha = alpha;
+    spec.hidden = NO;
+    [holder bringSubviewToFront:spec];
+    UIImageView *asset = (UIImageView *)[holder viewWithTag:LGB_ASSET_TAG];
+    if (asset) asset.alpha *= 0.55;
+    return YES;
+}
+
 // Khung viên thuốc nền: đo theo vùng nội dung thật của bar (trừ phần
 // tai thỏ/home indicator) và lề do người dùng chỉnh trong Cài đặt — bản
 // cũ tự trừ 14pt + cao tối đa 56 nên nhỏ hơn nền gốc của Messenger.
@@ -436,6 +482,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
             asset.image = LGBGlassImageForSize(existing.bounds.size);
             asset.alpha = 0.55 * pGlassAlpha;
         }
+        [self updateSpecularInHolder:existing size:existing.bounds.size intensity:0.8 alpha:pGlassAlpha];
         [self placeGlassViewsInBar:bar belowItems:items];
         return existing;
     }
@@ -467,6 +514,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
     [holder addSubview:asset];
     NSInteger idx = [self glassInsertIndexInBar:bar items:items];
     [bar insertSubview:holder atIndex:idx];
+    [self updateSpecularInHolder:holder size:frame.size intensity:0.8 alpha:pGlassAlpha];
     return holder;
 }
 
@@ -504,6 +552,7 @@ static BOOL LGBLooksLikeBadge(UIView *v) {
             sub.alpha = pBlobAlpha;
         }
     }
+    [self updateSpecularInHolder:ind size:ind.bounds.size intensity:1.0 alpha:pBlobAlpha];
 }
 
 - (UIView *)indicatorInBar:(UIView *)bar belowItems:(NSArray<UIView *> *)items {
@@ -1152,6 +1201,13 @@ static void LGBPrefsChanged(CFNotificationCenterRef center, void *observer,
         if (![bid isEqualToString:@"com.facebook.Messenger"]) return;
         LGBLoadPrefs();
         [[LGBManager shared] start];
+        // Biên dịch shader kính sẵn ở luồng nền để lần hiện đầu tiên
+        // không khựng; kết quả ghi vào chẩn đoán trong Cài đặt.
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            BOOL ok = LGBGlassShaderWarmUp();
+            LGBLog(@"Shader kinh (phong LiquidGlaze): %@", ok ? @"san sang" : @"khong dung duoc - lui ve kinh 1.3.0");
+            LGBDiagWrite(@"diag_shaderGlass", ok ? @"OK" : @"FAIL");
+        });
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL,
             LGBPrefsChanged, (__bridge CFStringRef)LGB_PREFS_NOTIFICATION, NULL,
             CFNotificationSuspensionBehaviorDeliverImmediately);
